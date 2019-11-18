@@ -3,7 +3,6 @@ import math
 import pprint
 from random import randint
 
-# Send your busters out into the fog to trap ghosts and bring them home!
 
 MAP_HEIGHT = 9000
 MAP_WIDTH = 16000
@@ -60,6 +59,7 @@ class C(object):
 
         return True
 
+
 def random_coord(coord):
     while True:
         c = C(randint(0, MAP_WIDTH),randint(0, MAP_HEIGHT))
@@ -67,8 +67,10 @@ def random_coord(coord):
         if c.distance(coord) > FOG_DIST*2 and c.is_close_to_wall():
             return c
 
+
 DESTINATION = {0: C(0,0),
                1: C(MAP_WIDTH, MAP_HEIGHT)}
+
 
 class Entity(object):
     def __init__(self, _id, x, y, _type, state, value):
@@ -86,6 +88,7 @@ class Entity(object):
 
     def get_id(self):
         return self.id
+
 
 class Buster(Entity):
     instances = []
@@ -111,7 +114,6 @@ class Buster(Entity):
 
     @classmethod
     def get_seen_one(cls, _id):
-        # print_debug(f='get_seen_one', str='gost is searching')
         for buster in __class__.instances:
             if buster.get_id() == _id:
                 return buster
@@ -129,9 +131,6 @@ class Buster(Entity):
             return self.value
         else:
             return None
-
-    def is_next_move_set():
-        return self.next_coords is not None
 
     def set_next_action(self, action):
         self.next_action = action
@@ -159,7 +158,6 @@ class Buster(Entity):
         if self.next_action == 'BUST':
             busting = self.to_be_busted
             self.to_be_busted = None
-            Ghost.get_seen_one(busting).is_targeted = False
             return ' '.join([self.next_action, str(busting)])
         return 'RELEASE'
 
@@ -176,24 +174,17 @@ class Ghost(Entity):
     instances = []
 
     def __init__(self, _id, x, y, _type, state, value):
-        #print_debug(gid=_id, x=x,y=y,type=_type,state=state,value=value)
         ghost = self.__class__.get_seen_one(_id)
         if ghost is None:
-            #print_debug(f='__init__', str='gost is none')
             super(Ghost, self).__init__(_id, x, y, _type, state, value)
             self.__class__.instances.append(self)
             self.busted = False
-            self.is_targeted = False
         else:
-            #print_debug(f='__init__', str='gost is seen')
             ghost.update(_id, x, y, _type, state, value)
-            #print_debug(id = _id, ghost_is_busted=ghost.busted, is_targeted= ghost.is_targeted)
             ghost.busted=False
-            #print_debug(id = _id, ghost_is_busted=ghost.busted, is_targeted= ghost.is_targeted)
 
     @classmethod
     def get_seen_one(cls, _id):
-        # print_debug(f='get_seen_one', str='gost is searching')
         for ghost in __class__.instances:
             if ghost.get_id() == _id:
                 return ghost
@@ -214,15 +205,14 @@ class Ghost(Entity):
 
     @classmethod
     def get_free_ghosts(cls):
-        return [ghost for ghost in cls.instances if ghost.is_free() and not ghost.is_targeted]
+        return [ghost for ghost in cls.instances if ghost.is_free() and not ghost.is_targeted()]
 
     def is_targeted(self):
-        return self.is_targeted
-        #for b in Buster.my_sorted_busters():
-        #    if self.id == b.to_be_busted:
-        #        return True
-        #else:
-        #    return False
+        for b in Buster.my_sorted_busters():
+            if self.id == b.to_be_busted:
+                return True
+        else:
+            return False
 
     def closest_buster(self):
         _id = -1
@@ -290,7 +280,6 @@ while True:
             if GHOST_MIN_RANGE < ghost.coords.distance(buster.coords) < GHOST_MAX_RANGE:
                 buster.set_to_be_busted(ghost.id)
             else:
-                ghost.is_targeted=True
                 buster.set_next_coords(ghost.coords)
         else:
             if random is None:
