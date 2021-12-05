@@ -1,8 +1,9 @@
 import sys
-import math
-import pprint
+import random
 
-# Bring data on patient samples from the diagnosis machine to the laboratory with enough molecules to produce medicine!
+
+_filter = lambda f, l: list(filter(f, l))
+_isdigit = lambda i: str(i).isdigit() if str(i)[0] != '-' else str(i)[1:].isdigit()
 
 
 USER_DATA = ['target', 'eta', 'score',
@@ -15,173 +16,35 @@ MAX_SAMPLE = 3
 MAX_MOLECULES = 10
 
 
-def print_debug(*args, **kwargs):
-    if len(args) != 0:
-        kwargs['__log__'] = args
-    print(pprint.pformat(kwargs), file=sys.stderr)
+def debug(*args):
+    print(', '.join(map(str, args)), file=sys.stderr)
 
 
 def parse_input_line(keywords=None):
-    if keywords is not None:
-        _return = dict()
+    raw_line = input()
+    splitted_line = raw_line.split()
 
-        try:
-            _input = input()
-        except Exception as e:
-            print_debug(exception=str(e))
-        else:
-            splitted = _input.split()
-            if len(splitted) != len(keywords):
-                raise Exception('wrong parameters')
-
-            for i in range(len(splitted)):
-                try:
-                    _return[keywords[i]] = int(splitted[i])
-                except ValueError:
-                    _return[keywords[i]] = splitted[i]
-
-        return _return
+    if keywords is None:
+        parsed = list()
+        keywords = [i for i in range(len(splitted_line))]
+        parsed = [None for kv in keywords]
     else:
-        try:
-            _input = input()
-        except Exception as e:
-            print_debug(exception=str(e))
-        else:
-            try:
-                return int(_input)
-            except:
-                return _input
+        parsed = dict()
+        if len(splitted_line) != len(keywords):
+            raise Exception('wrong parameters')
+
+    for kv in keywords:
+        _next = splitted_line.pop(0)
+        if _isdigit(_next):
+            _next = int(_next)
+
+        parsed[kv] = _next
+
+    debug(parsed)
+    return parsed
 
 
-class Sample(object):
-    instances = []
-    ready = []
-
-    def __init__(self, _id, _dict):
-        sample = self.__class__.get(_id)
-        if sample is None:
-            self.__class__.instances.append(self)
-            self.initialize(_id, _dict)
-        else:
-            sample.update(_dict)
-
-    def __repr__(self):
-        return 'samp_{}'.format(self.id)
-
-    def initialize(self, _id, _dict):
-        self.id = _id
-        self.data = _dict
-
-    def update(self, _dict):
-        self.data = _dict
-
-    def __eq__(self, other):
-        return self.id == other.id
-
-    def __ne__(self, other):
-        return self.id != other.id
-
-    def __hash__(self):
-        return self.id
-
-    @classmethod
-    def get(cls, _id):
-        for sample in __class__.instances:
-            if sample.id == _id:
-                return sample
-        else:
-            return None
-
-    @classmethod
-    def reset(cls):
-        cls.instances = []
-
-    @classmethod
-    def sorted_samples(cls):
-        return sorted([s for s in cls.instances if s['carried_by'] == -1], key=lambda j: j.value())[::-1]
-
-    def value(self):
-        return self['health']*1000/self.get_needed_count()
-
-    def __getitem__(self, key):
-        if key in self.data:
-            return self.data[key]
-        if key in dir(self):
-            return getattr(self, key)
-        else:
-            return None
-
-    @classmethod
-    def get_my_samples(cls):
-        return [s for s in cls.instances if s['carried_by'] == 0]
-
-    def pop(self):
-        self.__class__.instances.remove(self)
-
-    def get_needed_count(self):
-        needed = 0
-        needed += self['cost_a'] - User.instances[0]['expertise_a']
-        needed += self['cost_b'] - User.instances[0]['expertise_b']
-        needed += self['cost_c'] - User.instances[0]['expertise_c']
-        needed += self['cost_d'] - User.instances[0]['expertise_d']
-        needed += self['cost_e'] - User.instances[0]['expertise_e']
-        return needed
-
-    def would_full(self):
-        carriing = User.instances[0]['storage_a'] + \
-                   User.instances[0]['storage_b'] + \
-                   User.instances[0]['storage_c'] + \
-                   User.instances[0]['storage_d'] + \
-                   User.instances[0]['storage_e']
-        return carriing + self.get_needed_count() > MAX_MOLECULES
-
-    def all_expertise(self):
-        return User.instances[0]['expertise_a'] + \
-               User.instances[0]['expertise_b'] + \
-               User.instances[0]['expertise_c'] + \
-               User.instances[0]['expertise_d'] + \
-               User.instances[0]['expertise_e']
-
-class User(object):
-    instances = []
-
-    def __init__(self, _id, _dict):
-        user = self.__class__.get(_id)
-        if user is None:
-            self.__class__.instances.append(self)
-            self.initialize(_id, _dict)
-        else:
-            user.update(_dict)
-
-    def initialize(self, _id, _dict):
-        self.id = _id
-        self.data = _dict
-
-    def update(self, _dict):
-        self.data = _dict
-
-    @classmethod
-    def get(cls, _id):
-        for user in __class__.instances:
-            if user.id == _id:
-                return user
-        else:
-            return None
-
-    def __getitem__(self, key):
-        if key in self.data:
-            return self.data[key]
-        if key in dir(self):
-            return getattr(self, key)
-        else:
-            return None
-
-    @classmethod
-    def get_my_robot(cls):
-        return cls.instances[0]
-
-
-dist = {
+DISTANCES = {
     'START_POS':
         {'SAMPLES': 2,
          'DIAGNOSIS': 2,
@@ -208,100 +71,111 @@ dist = {
          'MOLECULES': 3,
          'LABORATORY': 0},
 }
-queue = []
 
-def go_to(destination):
-    global queue
-    place = User.get_my_robot()['target']
-    print('GOTO {}'.format(destination))
-    for i in range(1, dist[place][destination]):
-        queue.append('WAIT')
+PROJECT_COUNT = parse_input_line()[0]
+PROJECTS = [parse_input_line(MOLECULES) for i in range(PROJECT_COUNT)]
 
 
-def samples_analyzed():
-    samples = Sample.get_my_samples()
-    for i in samples:
-        if i['health'] == -1:
-            return False
-    else:
-        return True
+def get_action(**d):
+    my_samples = sorted(
+        _filter(lambda i: i['carried_by'] == 0, d['samples']),
+        key = lambda i: i['rank']
+    )
 
+    for i in my_samples:
+        i['cost_a'] = i['cost_a'] - me['expertise_a']
+        i['cost_b'] = i['cost_b'] - me['expertise_b']
+        i['cost_c'] = i['cost_c'] - me['expertise_c']
+        i['cost_d'] = i['cost_d'] - me['expertise_d']
+        i['cost_e'] = i['cost_e'] - me['expertise_e']
 
-project_count = int(input())
-for i in range(project_count):
-    a, b, c, d, e = [int(j) for j in input().split()]
+    undiagnosed = _filter(lambda i: i['health'] == -1, my_samples)
+    diagnosed = _filter(lambda i: i['health'] != -1, my_samples)
+    empties = [k for k, v in d['available'].items() if v == 0]
 
+    done = []
+    for sample in diagnosed:
+        if all([me['storage_'+i] >= sample['cost_'+i] for i in MOLECULES]):
+            done.append(sample)
 
+    if d['me']['eta'] > 0:
+        return ""
 
-# game loop
-while True:
-    for i in range(2):
-        User(i, parse_input_line(USER_DATA))
-
-    available_molecules = parse_input_line(MOLECULES)
-
-    sample_count = parse_input_line()
-    for i in range(sample_count):
-        sample_data = parse_input_line(SAMPLE_DATA)
-        Sample(sample_data['id'], sample_data)
-
-    my_robot = User.get_my_robot()
-
-    if len(queue) > 0:
-        command = queue.pop(0)
-        print(command)
-        continue
-
-    if my_robot['target'] == 'START_POS':
-        go_to('SAMPLES')
-    elif my_robot['target'] == 'SAMPLES':
-        if len(Sample.get_my_samples()) == 0:
-            print('CONNECT 3')
-        elif len(Sample.get_my_samples()) == 1:
-            print('CONNECT 2')
-        elif len(Sample.get_my_samples()) == 2:
-            print('CONNECT 1')
-        else:
-            go_to('DIAGNOSIS')
-    elif my_robot['target'] == 'DIAGNOSIS':
-        if samples_analyzed():
-            go_to('MOLECULES')
-        else:
-            my_samples = Sample.get_my_samples()
-            for s in my_samples:
-                if s['health'] == -1:
-                    print('CONNECT {}'.format(s['id']))
-                    break
-    elif my_robot['target'] == 'MOLECULES':
-        print_debug(ready = Sample.ready)
-        my_samples = Sample.get_my_samples()
-        print_debug(my_samples)
-        for s in set(my_samples) - set(Sample.ready):
-            print_debug(s.data)
-            if s.would_full():
-                print_debug('would full')
-                continue
+    if d['me']['target'] == 'SAMPLES':
+        if len(my_samples) < MAX_SAMPLE:
+            expertise = sum([d['me']['expertise_'+i] for i in MOLECULES])
+            if len(empties) > 0:
+                rank = 2
+            elif expertise < 3:
+                rank = random.randrange(1,3)
+            elif expertise < 6:
+                rank = random.randrange(1,4)
+            elif expertise < 9:
+                rank = random.randrange(2,4)
             else:
-                for m in MOLECULES:
-                    needed = s['cost_{}'.format(m)]
-                    expertise = User.get_my_robot()['expertise_{}'.format(m)]
-                    for k in range(needed-expertise):
-                        queue.append('CONNECT {}'.format(m.upper()))
+                rank = 3
 
-                command = queue.pop(0)
-                print(command)
-                Sample.ready.append(s)
-                break
+            return "connect {}".format(rank)
         else:
-            go_to('LABORATORY')
-    elif my_robot['target'] == 'LABORATORY':
-        print_debug(ready = Sample.ready)
-        my_samples = Sample.ready
+            return "GOTO DIAGNOSIS"
 
-        if len(Sample.ready) == 0:
-            go_to('SAMPLES')
+    if d['me']['target'] == 'DIAGNOSIS':
+        if len(undiagnosed) > 0:
+            return "connect {}".format(undiagnosed[0]['id'])
+
+        if len(empties) > 0:
+            for empty in empties:
+                for sample in diagnosed:
+                    if sample["cost_"+empty] - me['storage_'+empty] > 0:
+                        debug('empty', empty, 'cost', sample["cost_"+empty], 'storage', me['storage_'+empty])
+                        return 'CONNECT {}'.format(sample['id'])
+
+        if len(my_samples) < MAX_SAMPLE:
+            return 'GOTO SAMPLES'
+
+        return "GOTO MOLECULES"
+
+    if d['me']['target'] == 'MOLECULES':
+        if len(my_samples) == 0:
+            return 'GOTO SAMPLES'
+
+        for sample in diagnosed:
+            if all([me['storage_'+i] >= sample['cost_'+i] for i in MOLECULES]):
+                return 'GOTO LABORATORY'
+
+            if sum([sample['cost_'+i]-me['storage_'+i] for i in MOLECULES if sample['cost_'+i]>me['storage_'+i]]) + sum([me['storage_'+i] for i in MOLECULES]) > MAX_MOLECULES:
+                continue
+
+            needed = [i for i in MOLECULES if me['storage_'+i] < sample['cost_'+i]]
+            chosen = needed[-1]
+            if d['available'][chosen] == 0:
+                continue
+
+            return "CONNECT {}".format(chosen)
         else:
-            sample = Sample.ready.pop()
-            print('CONNECT {}'.format(sample['id']))
-    print_debug(User.get_my_robot().data)
-    Sample.reset()
+            if len(my_samples) < MAX_SAMPLE:
+                return "GOTO SAMPLES"
+            return 'GOTO DIAGNOSIS'
+
+    if d['me']['target'] == 'LABORATORY':
+        if len(done) > 0:
+            return "CONNECT {}".format(done[-1]['id'])
+        if len(diagnosed) > 0:
+            return 'GOTO MOLECULES'
+        if len(undiagnosed) > 0:
+            return 'GOTO DIAGNOSIS'
+        return 'GOTO SAMPLES'
+
+    if d['me']['target'] == 'START_POS':
+        return "GOTO SAMPLES"
+
+
+while True:
+    me = parse_input_line(USER_DATA)
+    enemy = parse_input_line(USER_DATA)
+    available = parse_input_line(MOLECULES)
+    sample_count = parse_input_line()[0]
+    samples = [parse_input_line(SAMPLE_DATA) for i in range(sample_count)]
+
+    action = get_action(me=me, enemy=enemy, available=available, samples=samples)
+    print(action)
