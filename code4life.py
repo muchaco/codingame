@@ -3,7 +3,6 @@ import random
 
 
 _filter = lambda f, l: list(filter(f, l))
-_isdigit = lambda i: str(i).isdigit() if str(i)[0] != '-' else str(i)[1:].isdigit()
 
 
 USER_DATA = ['target', 'eta', 'score',
@@ -21,56 +20,32 @@ def debug(*args):
 
 
 def parse_input_line(keywords=None):
+    _isdigit = lambda i: i.isdigit() if i[0] != '-' else i[1:].isdigit()
+
     raw_line = input()
     splitted_line = raw_line.split()
 
     if keywords is None:
         parsed = list()
-        keywords = [i for i in range(len(splitted_line))]
-        parsed = [None for kv in keywords]
+        keywords = [i for i, _ in enumerate(splitted_line)]
+        parsed = [None for _ in splitted_line]
     else:
         parsed = dict()
         if len(splitted_line) != len(keywords):
-            raise Exception('wrong parameters')
+            raise Exception('Wrong keywords were given')
 
-    for kv in keywords:
+    for kw in keywords:
         _next = splitted_line.pop(0)
         if _isdigit(_next):
             _next = int(_next)
 
-        parsed[kv] = _next
+        parsed[kw] = _next
 
     debug(parsed)
+
     return parsed
 
 
-DISTANCES = {
-    'START_POS':
-        {'SAMPLES': 2,
-         'DIAGNOSIS': 2,
-         'MOLECULES': 2,
-         'LABORATORY': 2},
-    'SAMPLES':
-        {'SAMPLES': 0,
-         'DIAGNOSIS': 3,
-         'MOLECULES': 3,
-         'LABORATORY': 3},
-    'DIAGNOSIS':
-        {'SAMPLES': 3,
-         'DIAGNOSIS': 0,
-         'MOLECULES': 3,
-         'LABORATORY': 4},
-    'MOLECULES':
-        {'SAMPLES': 3,
-         'DIAGNOSIS': 3,
-         'MOLECULES': 0,
-         'LABORATORY': 3},
-    'LABORATORY':
-        {'SAMPLES': 3,
-         'DIAGNOSIS': 4,
-         'MOLECULES': 3,
-         'LABORATORY': 0},
-}
 
 PROJECT_COUNT = parse_input_line()[0]
 PROJECTS = [parse_input_line(MOLECULES) for i in range(PROJECT_COUNT)]
@@ -79,7 +54,7 @@ PROJECTS = [parse_input_line(MOLECULES) for i in range(PROJECT_COUNT)]
 def get_action(**d):
     my_samples = sorted(
         _filter(lambda i: i['carried_by'] == 0, d['samples']),
-        key = lambda i: i['rank']
+        key = lambda i: -1*i['rank']
     )
 
     for i in my_samples:
@@ -140,22 +115,21 @@ def get_action(**d):
             return 'GOTO SAMPLES'
 
         for sample in diagnosed:
-            if all([me['storage_'+i] >= sample['cost_'+i] for i in MOLECULES]):
-                return 'GOTO LABORATORY'
-
             if sum([sample['cost_'+i]-me['storage_'+i] for i in MOLECULES if sample['cost_'+i]>me['storage_'+i]]) + sum([me['storage_'+i] for i in MOLECULES]) > MAX_MOLECULES:
                 continue
 
             needed = [i for i in MOLECULES if me['storage_'+i] < sample['cost_'+i]]
-            chosen = needed[-1]
-            if d['available'][chosen] == 0:
-                continue
 
-            return "CONNECT {}".format(chosen)
-        else:
-            if len(my_samples) < MAX_SAMPLE:
-                return "GOTO SAMPLES"
-            return 'GOTO DIAGNOSIS'
+            if d['available'][needed[-1]] != 0:
+                return "CONNECT {}".format(needed[-1])
+
+        if any([all([me['storage_'+i] >= sample['cost_'+i] for i in MOLECULES]) for sample in diagnosed]):
+            return 'GOTO LABORATORY'
+
+        if len(my_samples) < MAX_SAMPLE:
+            return "GOTO SAMPLES"
+
+        return 'GOTO DIAGNOSIS'
 
     if d['me']['target'] == 'LABORATORY':
         if len(done) > 0:
@@ -164,6 +138,7 @@ def get_action(**d):
             return 'GOTO MOLECULES'
         if len(undiagnosed) > 0:
             return 'GOTO DIAGNOSIS'
+
         return 'GOTO SAMPLES'
 
     if d['me']['target'] == 'START_POS':
