@@ -57,7 +57,7 @@ def move(_state, _next_player, _move):
 
 
 def get_optimal_move(_state, _previous_moves):
-    possible_moves = get_possible_moves(_state, _previous_moves, player=1)
+    possible_moves = get_possible_moves(_state, _previous_moves, _player=1)
     assert len(possible_moves) != 0
 
     if len(possible_moves) == 1:
@@ -67,7 +67,7 @@ def get_optimal_move(_state, _previous_moves):
     optimal_move = None
 
     for move in possible_moves:
-        if is_optimal_move(_state, move, player=1):
+        if is_optimal_move(_state, move, _player=1):
             return move
 
         candidate = evaluate_move(
@@ -118,8 +118,8 @@ def evaluate_move(_state, _move, _previous_moves):
         try:
             winner = random_game_simulation(
                 next_state,
-                next_player,  # enemy's turn
-                _previous_moves
+                next_player,
+                previous_moves
             )
         except MaxDapthReached:
             continue
@@ -139,9 +139,12 @@ def random_game_simulation(_state, _player, _previous_moves, _iteration=0):
 
     possible_moves = get_possible_moves(_state, _previous_moves, _player)
 
-    for possible_move in possible_moves:
+    for possible_move in possible_moves:  # TODO chose randomly from optimal
         if is_optimal_move(_state, possible_move, _player):
             return _player
+
+    if len(possible_moves) == 0:
+        return _player * -1
 
     random_move = random.choice(possible_moves)
     random_state = move(_state, _player, random_move)
