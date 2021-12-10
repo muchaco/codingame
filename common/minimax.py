@@ -17,7 +17,6 @@ def append(t, i):
 
 
 def main():
-    next_player = None
     previous_moves = {
         1: tuple(),   # player1 <- we are
         -1: tuple()   # player2
@@ -89,10 +88,16 @@ def get_possible_moves(_state, _previous_moves, _player):
 
     raise NotImplementedError()
 
+    possible_moves = get_prefered_moves(_state, possible_moves, _player)
+
     if len(possible_moves) > MAX_WIDTH:
         return random.sample(possible_moves, MAX_WIDTH)
 
     return possible_moves
+
+
+def get_prefered_moves(_state, possible_moves, _player):
+    raise NotImplementedError()
 
 
 def is_optimal_move(_state, _move, _player):
@@ -100,27 +105,32 @@ def is_optimal_move(_state, _move, _player):
 
 
 def evaluate_move(_state, _move, _previous_moves):
-    next_state = move(_state, 1, _move)  # my move
-    best_value = None
+    previous_moves = _previous_moves.copy()
+    previous_moves[1] = append(previous_moves[1], _move)
+    next_state, next_player = move(_state, 1, _move)  # my move
 
-    for _ in range(PRECISION):
+    winners = {
+        -1: 0,
+        1: 0
+    }
+
+    while sum(winners.values()) != PRECISION:
         try:
-            game_value = random_game_simulation(
-                _state,
-                -1,  # enemy's turn
+            winner = random_game_simulation(
+                next_state,
+                next_player,  # enemy's turn
                 _previous_moves
             )
         except MaxDapthReached:
             continue
 
-        if best_value is None or game_comparer(game_value, best_value):
-            best_value = game_value
+        winners[winner] += 1
 
-    return best_value
+    return winners[1]/(winners[1]+winners[-1])
 
 
 def game_comparer(g1, g2):
-    return g1 < g2
+    return g1 > g2
 
 
 def random_game_simulation(_state, _player, _previous_moves, _iteration=0):
@@ -129,33 +139,23 @@ def random_game_simulation(_state, _player, _previous_moves, _iteration=0):
 
     possible_moves = get_possible_moves(_state, _previous_moves, _player)
 
-    if len(possible_moves) == 0:
-        if _player == 1:
-            return 1
-        else:
-            return 0
-
-    if _player == 1:
-        for possible_move in possible_moves:
-            if is_optimal_move(_state, possible_move, _player):
-                return 1
+    for possible_move in possible_moves:
+        if is_optimal_move(_state, possible_move, _player):
+            return _player
 
     random_move = random.choice(possible_moves)
     random_state = move(_state, _player, random_move)
     previous_moves = _previous_moves.copy()
     previous_moves[_player] = append(previous_moves[_player], random_move)
 
-    simulation = random_game_simulation(
+    winner = random_game_simulation(
         random_state,
         -1 * _player,
         previous_moves,
         _iteration + 1
     )
 
-    if _player == 1:
-        return simulation + 1
-    else:
-        return simulation
+    return winner
 
 
 if __name__ == "__main__":
