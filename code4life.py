@@ -1,5 +1,6 @@
 import sys
 import random
+import inspect
 
 
 _filter = lambda f, l: list(filter(f, l))
@@ -16,7 +17,8 @@ MAX_MOLECULES = 10
 
 
 def debug(*args):
-    print(', '.join(map(str, args)), file=sys.stderr)
+    line_number = inspect.getframeinfo(inspect.currentframe().f_back).lineno
+    print(line_number, ', '.join(map(str, args)), file=sys.stderr)
 
 
 def parse_input_line(keywords=None):
@@ -41,10 +43,9 @@ def parse_input_line(keywords=None):
 
         parsed[kw] = _next
 
-    debug(parsed)
+    # debug(parsed)
 
     return parsed
-
 
 
 PROJECT_COUNT = parse_input_line()[0]
@@ -52,43 +53,50 @@ PROJECTS = [parse_input_line(MOLECULES) for i in range(PROJECT_COUNT)]
 
 
 def get_action(**d):
-    my_samples = sorted(
-        _filter(lambda i: i['carried_by'] == 0, d['samples']),
-        key = lambda i: -1*i['rank']
-    )
+    for s in d['samples']:
+        for m in MOLECULES:
+            s['cost_'+m] = s['cost_'+m] - d['me']['expertise_'+m] - d['me']['storage_'+m]
 
-    for i in my_samples:
-        i['cost_a'] = i['cost_a'] - me['expertise_a']
-        i['cost_b'] = i['cost_b'] - me['expertise_b']
-        i['cost_c'] = i['cost_c'] - me['expertise_c']
-        i['cost_d'] = i['cost_d'] - me['expertise_d']
-        i['cost_e'] = i['cost_e'] - me['expertise_e']
-
-    undiagnosed = _filter(lambda i: i['health'] == -1, my_samples)
-    diagnosed = _filter(lambda i: i['health'] != -1, my_samples)
+    my_samples = sorted(_filter(lambda s: s['carried_by'] == 0, d['samples']), key = lambda s: -1*s['rank'])
+    cloud_samples = sorted(_filter(lambda s: s['carried_by'] == -1, d['samples']), key = lambda s: -1*s['rank'])
+    undiagnosed = _filter(lambda s: s['health'] == -1, my_samples)
+    diagnosed = _filter(lambda s: s['health'] != -1, my_samples)
     empties = [k for k, v in d['available'].items() if v == 0]
+    amount_in_storage = sum([d['me']['storage_'+m] for m in MOLECULES])
+    cloud_candidates = _filter(
+        lambda s: sum([s['cost_'+m] for m in MOLECULES if s['cost_'+m]>0]) + amount_in_storage <= MAX_MOLECULES,
+        _filter(lambda s: all([s['cost_'+m] <= d['available'][m] for m in MOLECULES]), cloud_samples)
+    )
+    collected = [s for s in diagnosed if all([s['cost_'+m] <= 0 for m in MOLECULES])]
+    expertise = sum([d['me']['expertise_'+m] for m in MOLECULES])
+    still_needed_amount = lambda s: sum([s['cost_'+m] for m in MOLECULES if s['cost_'+m] > 0])
 
-    done = []
-    for sample in diagnosed:
-        if all([me['storage_'+i] >= sample['cost_'+i] for i in MOLECULES]):
-            done.append(sample)
+    for s in my_samples:
+        debug(s)
+    debug(d['me'])
 
     if d['me']['eta'] > 0:
         return ""
 
     if d['me']['target'] == 'SAMPLES':
-        if len(my_samples) < MAX_SAMPLE:
-            expertise = sum([d['me']['expertise_'+i] for i in MOLECULES])
-            if len(empties) > 0:
-                rank = 2
-            elif expertise < 3:
-                rank = random.randrange(1,3)
+        if len(my_samples + cloud_candidates) < MAX_SAMPLE:
+            ranked = lambda n: len(_filter(lambda s: s['rank'] == n, my_samples + cloud_candidates))
+
+            if expertise < 4:
+                if ranked(1) < 2:
+                    rank = 1
+                elif ranked(2) == 0:
+                    rank = 2
             elif expertise < 6:
-                rank = random.randrange(1,4)
-            elif expertise < 9:
-                rank = random.randrange(2,4)
+                if ranked(3) == 0:
+                    rank = 3
+                elif ranked(1) < 2:
+                    rank = 1
             else:
-                rank = 3
+                if ranked(1) < 1:
+                    rank = 1
+                elif ranked(3) < 2:
+                    rank = 3
 
             return "connect {}".format(rank)
         else:
@@ -96,48 +104,88 @@ def get_action(**d):
 
     if d['me']['target'] == 'DIAGNOSIS':
         if len(undiagnosed) > 0:
-            return "connect {}".format(undiagnosed[0]['id'])
+            debug('diagnosis needed')
+            return "CONNECT {}".format(undiagnosed[0]['id'])
 
-        if len(empties) > 0:
-            for empty in empties:
-                for sample in diagnosed:
-                    if sample["cost_"+empty] - me['storage_'+empty] > 0:
-                        debug('empty', empty, 'cost', sample["cost_"+empty], 'storage', me['storage_'+empty])
-                        return 'CONNECT {}'.format(sample['id'])
+        for s in diagnosed:
+            for m in MOLECULES:
+                if s["cost_"+m] > d['available'][m] + 1:
+                    debug('send to cloud (costs more than we have)')
+                    return 'CONNECT {}'.format(s['id'])
+
+            if still_needed_amount(s) + amount_in_storage > MAX_MOLECULES +2:
+                debug('send to cloud (couldnt fit in my pocket)')
+                return 'CONNECT {}'.format(s['id'])
 
         if len(my_samples) < MAX_SAMPLE:
+            if len(cloud_candidates) > 0:
+                debug('get sample from cloud')
+                return "CONNECT {}".format(cloud_candidates[0]['id'])
+
+            if len(my_samples) >= 2:
+                debug('dont be maximalist, two is enough for me')
+                return "GOTO MOLECULES"
+
+            debug('needs another sample')
             return 'GOTO SAMPLES'
 
+        debug('ready to get molecules')
         return "GOTO MOLECULES"
 
     if d['me']['target'] == 'MOLECULES':
         if len(my_samples) == 0:
+            debug('I have no samples')
             return 'GOTO SAMPLES'
 
-        for sample in diagnosed:
-            if sum([sample['cost_'+i]-me['storage_'+i] for i in MOLECULES if sample['cost_'+i]>me['storage_'+i]]) + sum([me['storage_'+i] for i in MOLECULES]) > MAX_MOLECULES:
+        for s in diagnosed:
+            if still_needed_amount(s) + amount_in_storage > MAX_MOLECULES:
+                debug("this sample couldnt fit in my storage")
                 continue
 
-            needed = [i for i in MOLECULES if me['storage_'+i] < sample['cost_'+i]]
+            needed_molecules = [m for m in MOLECULES if s['cost_'+m] > 0]
 
-            if d['available'][needed[-1]] != 0:
-                return "CONNECT {}".format(needed[-1])
+            if len(needed_molecules) != 0 and d['available'][needed_molecules[-1]] != 0:
+                debug('I need a molecule to move on')
+                return "CONNECT {}".format(needed_molecules[-1])
 
-        if any([all([me['storage_'+i] >= sample['cost_'+i] for i in MOLECULES]) for sample in diagnosed]):
+        if len(collected) > 0:
+            debug('I have my mollecules, need to progress')
             return 'GOTO LABORATORY'
 
         if len(my_samples) < MAX_SAMPLE:
+            debug('I can have more samples here')
             return "GOTO SAMPLES"
 
+        debug('I have no idea, lets go to diagnosis')
         return 'GOTO DIAGNOSIS'
 
     if d['me']['target'] == 'LABORATORY':
-        if len(done) > 0:
-            return "CONNECT {}".format(done[-1]['id'])
+        if len(collected) > 0:
+            return "CONNECT {}".format(collected[-1]['id'])
+
         if len(diagnosed) > 0:
-            return 'GOTO MOLECULES'
+            any_molecules_missing_for_samples = [any([s['cost_'+m] > d['available'][m] for m in MOLECULES]) for s in diagnosed]
+            if all(any_molecules_missing_for_samples):
+                debug('all my samples are bad')
+                if len(my_samples) < MAX_SAMPLE:
+                    debug('I need another samples')
+                    return "GOTO SAMPLES"
+                else:
+                    return "GOTO DIAGNOSIS"
+
+            for s in diagnosed:
+
+                if still_needed_amount(s) + amount_in_storage < MAX_MOLECULES:
+                    debug('I can still collect some molecule')
+                    return 'GOTO MOLECULES'
+
         if len(undiagnosed) > 0:
+            debug('I have something to diagnose')
             return 'GOTO DIAGNOSIS'
+
+        if len(cloud_candidates) > 1:
+            debug('I can fetch something from the cloud')
+            return "GOTO DIAGNOSIS"
 
         return 'GOTO SAMPLES'
 
@@ -150,7 +198,7 @@ while True:
     enemy = parse_input_line(USER_DATA)
     available = parse_input_line(MOLECULES)
     sample_count = parse_input_line()[0]
-    samples = [parse_input_line(SAMPLE_DATA) for i in range(sample_count)]
+    samples = [parse_input_line(SAMPLE_DATA) for _ in range(sample_count)]
 
     action = get_action(me=me, enemy=enemy, available=available, samples=samples)
     print(action)
