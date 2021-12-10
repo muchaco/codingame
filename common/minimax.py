@@ -139,7 +139,7 @@ def random_game_simulation(_state, _player, _previous_moves, _iteration=0):
 
     possible_moves = get_possible_moves(_state, _previous_moves, _player)
 
-    for possible_move in possible_moves:  # TODO chose randomly from optimal
+    for possible_move in possible_moves:
         if is_optimal_move(_state, possible_move, _player):
             return _player
 
