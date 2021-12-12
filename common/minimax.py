@@ -29,12 +29,14 @@ def main():
         last_move = get_last_move()
         if last_move is not None:
             next_player = -1
-            previous_moves[next_player] = append(previous_moves[next_player], last_move)
+            previous_moves[next_player] = append(
+                previous_moves[next_player], last_move)
             state, next_player = move(state, next_player, last_move)
 
         best_move = get_optimal_move(state, previous_moves)
         state, next_player = move(state, next_player, best_move)
-        previous_moves[next_player] = append(previous_moves[next_player], best_move)
+        previous_moves[next_player] = append(
+            previous_moves[next_player], best_move)
 
         print(best_move)
 
@@ -67,9 +69,6 @@ def get_optimal_move(_state, _previous_moves):
     optimal_move = None
 
     for move in possible_moves:
-        if is_optimal_move(_state, move, _player=1):
-            return move
-
         candidate = evaluate_move(
             _state,
             move,
@@ -114,7 +113,7 @@ def evaluate_move(_state, _move, _previous_moves):
         1: 0
     }
 
-    while sum(winners.values()) != PRECISION:
+    while sum(winners.values()) < PRECISION:
         try:
             winner = random_game_simulation(
                 next_state,
