@@ -147,9 +147,6 @@ def get_optimal_move(_state, _previous_moves):
     optimal_move = None
 
     for move in possible_moves:
-        if is_optimal_move(move):
-            return move
-
         candidate = evaluate_move(
             _state,
             move,
@@ -165,7 +162,7 @@ def get_optimal_move(_state, _previous_moves):
 def get_possible_moves(_state, _previous_moves, _player):
     possible_moves = []
 
-    if len(_state[0]) == 24:
+    if len(_state[0]) >= 23:
         for p1 in _state[0]:
             possible_moves.append('PLACE;{}'.format(p1))
     elif len(_previous_moves[_player]) == 0:
@@ -179,25 +176,34 @@ def get_possible_moves(_state, _previous_moves, _player):
                     millless = not_in_mill(_state[-1 * _player])
                     if len(millless) > 0:
                         for p2 in millless:
-                            possible_moves.append('PLACE&TAKE;{};{}'.format(p1, p2))
+                            possible_moves.append(
+                                'PLACE&TAKE;{};{}'.format(p1, p2))
                     else:
                         for p2 in _state[-1 * _player]:
-                            possible_moves.append('PLACE&TAKE;{};{}'.format(p1, p2))
+                            possible_moves.append(
+                                'PLACE&TAKE;{};{}'.format(p1, p2))
                 else:
                     possible_moves.append('PLACE;{}'.format(p1))
     else:
         for p1 in _state[_player]:
-            for p2 in GRAPH[p1]:  # TODO flying
+            if len(_state[_player]) == 3:  # flying
+                g = _state[0]
+            else:
+                g = GRAPH[p1]
+
+            for p2 in g:  # TODO flying
                 if p2 not in _state[0]:
                     continue
                 if in_mill(_state[_player] - {p1}, p2):
                     millless = not_in_mill(_state[-1 * _player])
                     if len(millless) > 0:
                         for p3 in millless:
-                            possible_moves.append('MOVE&TAKE;{};{};{}'.format(p1, p2, p3))
+                            possible_moves.append(
+                                'MOVE&TAKE;{};{};{}'.format(p1, p2, p3))
                     else:
                         for p3 in _state[-1 * _player]:
-                            possible_moves.append('MOVE&TAKE;{};{};{}'.format(p1, p2, p3))
+                            possible_moves.append(
+                                'MOVE&TAKE;{};{};{}'.format(p1, p2, p3))
                 else:
                     possible_moves.append('MOVE;{};{}'.format(p1, p2))
 
@@ -250,6 +256,7 @@ def get_prefered_moves(_state, _possible_moves, _player):
 
     return possible_moves
 
+
 def is_optimal_move(_move):
     if 'TAKE' in _move:
         return True
@@ -292,7 +299,7 @@ def random_game_simulation(_state, _player, _previous_moves, _iteration=0):
 
     possible_moves = get_possible_moves(_state, _previous_moves, _player)
 
-    for possible_move in possible_moves:  # TODO chose randomly from optimal
+    for possible_move in possible_moves:
         if is_optimal_move(possible_move):
             return _player
 
