@@ -1,4 +1,4 @@
-# from functools import cache
+from copy import deepcopy
 import random
 
 
@@ -7,7 +7,7 @@ MAX_WIDTH = 10
 MAX_DEPTH = 10
 
 
-class MaxDapthReached(Exception):
+class MaxDepthReached(Exception):
     pass
 
 
@@ -50,7 +50,7 @@ def get_last_move():
 
 
 def move(_state, _next_player, _move):
-    state = _state.copy()
+    state = deepcopy(_state)
     next_player = -1 * _next_player
 
     raise NotImplementedError()
@@ -104,7 +104,7 @@ def is_optimal_move(_state, _move, _player):
 
 
 def evaluate_move(_state, _move, _previous_moves):
-    previous_moves = _previous_moves.copy()
+    previous_moves = deepcopy(_previous_moves)
     previous_moves[1] = append(previous_moves[1], _move)
     next_state, next_player = move(_state, 1, _move)  # my move
 
@@ -120,7 +120,7 @@ def evaluate_move(_state, _move, _previous_moves):
                 next_player,
                 previous_moves
             )
-        except MaxDapthReached:
+        except MaxDepthReached:
             continue
 
         winners[winner] += 1
@@ -134,7 +134,7 @@ def game_comparer(g1, g2):
 
 def random_game_simulation(_state, _player, _previous_moves, _iteration=0):
     if _iteration >= MAX_DEPTH:
-        raise MaxDapthReached()
+        raise MaxDepthReached()
 
     possible_moves = get_possible_moves(_state, _previous_moves, _player)
 
@@ -147,7 +147,7 @@ def random_game_simulation(_state, _player, _previous_moves, _iteration=0):
 
     random_move = random.choice(possible_moves)
     random_state = move(_state, _player, random_move)
-    previous_moves = _previous_moves.copy()
+    previous_moves = deepcopy(_previous_moves)
     previous_moves[_player] = append(previous_moves[_player], random_move)
 
     winner = random_game_simulation(

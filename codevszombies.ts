@@ -43,41 +43,83 @@ const parseInput = function () {
     return inputs;
 }
 
+
 const distance = function (a: Object, b: Object) {
-    return Math.floor(Math.sqrt((a['x'] - b['x']) ** 2 + a['y'] - b['y']))
+    return Math.floor(Math.sqrt((a['x'] - b['x']) ** 2 + (a['y'] - b['y']) ** 2))
 }
 
-const calculateAction = function (input: Object): Object {
-    let worstZombie = null;
-    let worstDistance = null;
 
-    Object.entries(input['zombies']).forEach(function ([zombieId, zombieObject]) {
-        let nearestHuman = null;
-        let nearestDistance = null;
-
-        Object.entries(input['humans']).forEach(function ([humanId, humanObject]) {
-            let distanceCandidate = distance(humanObject, zombieObject)
-            if (nearestHuman === null || distanceCandidate < nearestDistance) {
-                nearestDistance = distanceCandidate;
-                nearestHuman = humanId;
-            }
-        })
-
-        if (worstZombie === null || nearestHuman < worstDistance) {
-            worstDistance = nearestHuman;
-            worstZombie = zombieId;
-        }
-    })
-
-    return {
-        'x': input['zombies'][worstZombie]['x'],
-        'y': input['zombies'][worstZombie]['y']
+const inLine = function (a: Object, b: Object, c: Object) {
+    const d1 = distance(a, b);
+    const d2 = distance(b, c);
+    const d3 = distance(a, c);
+    let sorted = [d1, d2, d3];
+    sorted.sort(function (a, b) { return a - b });
+    console.error(`${sorted}`)
+    if (sorted[0] + sorted[1] - sorted[2] < 3) {
+        console.error('egyvonelbenvannak');
+        return true;
+    } else {
+        console.error('nincsnewkje gyvonalban');
+        return false;
     }
 }
+
+
+const canBeSaved = function (ash: Object, human: Object, zombie: Object) {
+    let ourDistance = distance(ash, human);
+    let theirDistance = distance(human, zombie);
+    let myTurn = ourDistance / move;
+    let theirTurn = theirDistance / zombieMove;
+    if (theirTurn > myTurn) {
+        console.error('megmentheto');
+        return true;
+    } else {
+
+        console.error('nemmegmentheto');
+        return false;
+    }
+}
+
+
+const calculateAction = function (input: Object): Object {
+    let worstHuman = null;
+    let worstDistance = null;
+
+    Object.entries(input['humans']).forEach(function ([humanId, humanObject]) {
+        Object.entries(input['zombies']).forEach(function ([_, zombieObject]) {
+            let nextZombie = {
+                'x': zombieObject['nextX'],
+                'y': zombieObject['nextY']
+            }
+
+            if (!(inLine(humanObject, zombieObject, nextZombie))) {
+                return;
+            }
+
+            let distanceCandidate = distance(humanObject, zombieObject)
+
+            if (worstHuman === null || distanceCandidate < worstDistance) {
+                if (canBeSaved(input['ash'], humanObject, zombieObject)) {
+                    worstDistance = distanceCandidate;
+                    worstHuman = humanId;
+                }
+            } else {
+            }
+        })
+    })
+
+    if (worstHuman === null) {
+        return input['ash'];
+    }
+    return input['humans'][worstHuman];
+}
+
 
 const generateOutput = function (action: Object): void {
     console.log(`${action['x']} ${action['y']}`);
 }
+
 
 while (true) {
     try {
